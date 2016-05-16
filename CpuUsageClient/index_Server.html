@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>CPU Usage Client</title>
+        
+        <script src="Chart.js"></script>
+
+        <!- CHECK THE LATEST ENETER VERSION AT http://eneter.net/ -->
+        <script src="eneter-messaging-6.5.0.js"></script>
+
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    </head>
+    <body onunload="closeConnection();">
+        <div>
+            <button type="button" onclick="openConnection();">1. Open Connection</button>
+        </div>
+        <div>
+            <button type="button" onclick="subscribe();">2. Subscribe</button>
+            <button type="button" onclick="unsubscribe();">3. Unsubscribe</button>
+        </div>
+        <div>
+            <button type="button" onclick="closeConnection();">4. Close Connection</button>
+        </div>
+        <div id="output">
+        </div>
+        <div>
+            <canvas id="canvas" height="300" width="300"></canvas>
+        </div>
+        
+        <script>
+            // Initialize chart.
+            var myChartConfig = {
+                        animation : false,
+                        scaleOverlay : true,
+                        scaleOverride : true,
+                	scaleSteps : 10,
+                        scaleStepWidth : 10,
+                        scaleStartValue : 0
+            };
+            var myLineChartData = {
+			labels : ["", "", "", "", "", "", "", "", "", ""],
+			datasets : [
+				{
+					fillColor : "rgba(220,220,220,0.5)",
+					strokeColor : "rgba(220,220,220,1)",
+					pointColor : "rgba(220,220,220,1)",
+					pointStrokeColor : "#fff",
+					data : [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+				}
+			]
+			
+		};
+            var myChart = new Chart(document.getElementById("canvas").getContext("2d"));
+            
+            // Create the duplex output channel.
+            var myOutputChannel = new WebSocketDuplexOutputChannel("ws://192.168.0.15:8843/CpuUsage/", null);
+
+            // Create BrokerClient
+            var myBrokerClient = new DuplexBrokerClient();
+            
+            // Subscribe to notifications.
+            myBrokerClient.onBrokerMessageReceived = onBrokerMessageReceived;
+            
+            function openConnection() {
+                // Attach output channel and be able to send messages and receive responses.
+                myBrokerClient.attachDuplexOutputChannel(myOutputChannel);
+            };
+
+            function closeConnection() {
+                // Detach output channel and stop listening to responses.
+                myBrokerClient.detachDuplexOutputChannel();
+            };
+
+            function subscribe() {
+                myBrokerClient.subscribe("MyCpuUpdate");
+            };
+
+            function unsubscribe() {
+                myBrokerClient.unsubscribe("MyCpuUpdate");
+            };
+            
+            function onBrokerMessageReceived(brokerMessageReceivedEventArgs) {
+                // If the notified message is the CPU status update.
+                if (brokerMessageReceivedEventArgs.MessageTypeId === "MyCpuUpdate")
+                {
+                    // Deserialize notified message content.
+                    var aValue = JSON.parse(brokerMessageReceivedEventArgs.Message);
+                    
+                    // Update data and draw the chart.
+                    myLineChartData.datasets[0].data.shift();
+                    myLineChartData.datasets[0].data.push(aValue.Usage);
+                    myChart.Line(myLineChartData, myChartConfig);
+                }
+            };
+        </script>
+    </body>
+</html>
